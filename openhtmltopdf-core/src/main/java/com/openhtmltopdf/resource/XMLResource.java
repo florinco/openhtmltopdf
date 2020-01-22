@@ -51,88 +51,87 @@ import com.openhtmltopdf.util.ThreadCtx;
 import com.openhtmltopdf.util.XRLog;
 import com.openhtmltopdf.util.XRRuntimeException;
 
-
 /**
  * @author Patrick Wright
  */
 public class XMLResource extends AbstractResource {
-    private Document document;
-    private static final XMLResourceBuilder XML_RESOURCE_BUILDER;
-    private static boolean useConfiguredParser;
+	private Document document;
+	private static final XMLResourceBuilder XML_RESOURCE_BUILDER;
+	private static boolean useConfiguredParser;
 
-    static {
-        XML_RESOURCE_BUILDER = new XMLResourceBuilder();
-        useConfiguredParser = true;
-    }
+	static {
+		XML_RESOURCE_BUILDER = new XMLResourceBuilder();
+		useConfiguredParser = true;
+	}
 
-    private XMLResource(InputStream stream) {
-        super(stream);
-    }
+	private XMLResource(InputStream stream) {
+		super(stream);
+	}
 
-    private XMLResource(InputSource source) {
-        super(source);
-    }
+	private XMLResource(InputSource source) {
+		super(source);
+	}
 
-    public static XMLResource load(InputStream stream) {
-        return XML_RESOURCE_BUILDER.createXMLResource(new XMLResource(stream));
-    }
+	public static XMLResource load(InputStream stream) {
+		return XML_RESOURCE_BUILDER.createXMLResource(new XMLResource(stream));
+	}
 
-    public static XMLResource load(InputSource source) {
-        return XML_RESOURCE_BUILDER.createXMLResource(new XMLResource(source));
-    }
+	public static XMLResource load(InputSource source) {
+		return XML_RESOURCE_BUILDER.createXMLResource(new XMLResource(source));
+	}
 
-    public static XMLResource load(Reader reader) {
-        return XML_RESOURCE_BUILDER.createXMLResource(new XMLResource(new InputSource(reader)));
-    }
+	public static XMLResource load(Reader reader) {
+		return XML_RESOURCE_BUILDER.createXMLResource(new XMLResource(new InputSource(reader)));
+	}
 
-    @Deprecated
-    public static XMLResource load(Source source) {
-        return XML_RESOURCE_BUILDER.createXMLResource(source);
-    }
+	@Deprecated
+	public static XMLResource load(Source source) {
+		return XML_RESOURCE_BUILDER.createXMLResource(source);
+	}
 
-    public Document getDocument() {
-        return document;
-    }
+	public Document getDocument() {
+		return document;
+	}
 
-    /*package*/
-    void setDocument(Document document) {
-        this.document = document;
-    }
+	/*package*/
+	void setDocument(Document document) {
+		this.document = document;
+	}
 
-    public static final XMLReader newXMLReader() {
-        XMLReader xmlReader = null;
-        String xmlReaderClass = Configuration.valueFor("xr.load.xml-reader");
-        
-        //TODO: if it doesn't find the parser, note that in a static boolean--otherwise
-        // you get exceptions on every load
-        try {
-            if (xmlReaderClass != null &&
-                    !xmlReaderClass.toLowerCase().equals("default") &&
-                    XMLResource.useConfiguredParser) {
-                try {
-                    Class.forName(xmlReaderClass);
-                } catch (Exception ex) {
-                    XMLResource.useConfiguredParser = false;
-                    XRLog.load(Level.WARNING,
-                            "The XMLReader class you specified as a configuration property " +
-                            "could not be found. Class.forName() failed on "
-                            + xmlReaderClass + ". Please check classpath. Use value 'default' in " +
-                            "FS configuration if necessary. Will now try JDK default.");
-                }
-                if (XMLResource.useConfiguredParser) {
-                    xmlReader = XMLReaderFactory.createXMLReader(xmlReaderClass);
-                }
-            }
-        } catch (Exception ex) {
-            XRLog.load(Level.WARNING,
-                    "Could not instantiate custom XMLReader class for XML parsing: "
-                    + xmlReaderClass + ". Please check classpath. Use value 'default' in " +
-                    "FS configuration if necessary. Will now try JDK default.", ex);
-        }
-        if (xmlReader == null) {
-            try {
-                // JDK default
-                // HACK: if
+	public static final XMLReader newXMLReader() {
+		XMLReader xmlReader = null;
+		String xmlReaderClass = Configuration.valueFor("xr.load.xml-reader");
+
+		//TODO: if it doesn't find the parser, note that in a static boolean--otherwise
+		// you get exceptions on every load
+		try {
+			if (xmlReaderClass != null &&
+					!xmlReaderClass.toLowerCase().equals("default") &&
+					XMLResource.useConfiguredParser) {
+				try {
+					Class.forName(xmlReaderClass);
+				} catch (Exception ex) {
+					XMLResource.useConfiguredParser = false;
+					XRLog.load(Level.WARNING,
+							"The XMLReader class you specified as a configuration property " +
+									"could not be found. Class.forName() failed on "
+									+ xmlReaderClass + ". Please check classpath. Use value 'default' in " +
+									"FS configuration if necessary. Will now try JDK default.");
+				}
+				if (XMLResource.useConfiguredParser) {
+					xmlReader = XMLReaderFactory.createXMLReader(xmlReaderClass);
+				}
+			}
+		} catch (Exception ex) {
+			XRLog.load(Level.WARNING,
+					"Could not instantiate custom XMLReader class for XML parsing: "
+							+ xmlReaderClass + ". Please check classpath. Use value 'default' in " +
+							"FS configuration if necessary. Will now try JDK default.", ex);
+		}
+		if (xmlReader == null) {
+			try {
+				// JDK default
+				// HACK: if
                 /*CHECK: does this code do anything?
                 if (System.getProperty("org.xml.sax.driver") == null) {
                     String newDefault = "org.apache.crimson.parser.XMLReaderImpl";
@@ -140,282 +139,285 @@ public class XMLResource extends AbstractResource {
                             "No value for system property 'org.xml.sax.driver'.");
                 }
                 */
-                xmlReader = XMLReaderFactory.createXMLReader();
-                xmlReaderClass = "{JDK default}";
-            } catch (Exception ex) {
-                XRLog.general(ex.getMessage());
-            }
-        }
-        if (xmlReader == null) {
-            try {
-                XRLog.load(Level.WARNING, "falling back on the default parser");
-                SAXParser parser = SAXParserFactory.newInstance().newSAXParser();
-                xmlReader = parser.getXMLReader();
-                xmlReaderClass = "SAXParserFactory default";
-            } catch (Exception ex) {
-                XRLog.general(ex.getMessage());
-            }
-        }
-        if (xmlReader == null) {
-            throw new XRRuntimeException("Could not instantiate any SAX 2 parser, including JDK default. " +
-                    "The name of the class to use should have been read from the org.xml.sax.driver System " +
-                    "property, which is set to: "/*CHECK: is this meaningful? + System.getProperty("org.xml.sax.driver")*/);
-        }
-        XRLog.load("SAX XMLReader in use (parser): " + xmlReader.getClass().getName());
-        return xmlReader;
-    }
+				xmlReader = XMLReaderFactory.createXMLReader();
+				xmlReaderClass = "{JDK default}";
+			} catch (Exception ex) {
+				XRLog.general(ex.getMessage());
+			}
+		}
+		if (xmlReader == null) {
+			try {
+				XRLog.load(Level.WARNING, "falling back on the default parser");
+				SAXParser parser = SAXParserFactory.newInstance().newSAXParser();
+				xmlReader = parser.getXMLReader();
+				xmlReaderClass = "SAXParserFactory default";
+			} catch (Exception ex) {
+				XRLog.general(ex.getMessage());
+			}
+		}
+		if (xmlReader == null) {
+			throw new XRRuntimeException("Could not instantiate any SAX 2 parser, including JDK default. " +
+					"The name of the class to use should have been read from the org.xml.sax.driver System " +
+					"property, which is set to: "/*CHECK: is this meaningful? + System.getProperty("org.xml.sax.driver")*/);
+		}
+		XRLog.load("SAX XMLReader in use (parser): " + xmlReader.getClass().getName());
+		return xmlReader;
+	}
 
-    private static class XMLResourceBuilder {
-    	
-    	private void setXmlReaderSecurityFeatures(XMLReader xmlReader) {
-            try {
-           	 // VERY IMPORTANT: Without these lines, users can pull in arbitary files from the system using XXE.
-           	 // DO NOT REMOVE!
-          	 xmlReader.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false);
-           	 xmlReader.setFeature("http://xml.org/sax/features/external-general-entities", false);
-           	 xmlReader.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-           	 xmlReader.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", true);
-           	 xmlReader.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-           } catch (SAXNotSupportedException e) {
-           	 XRLog.load(Level.SEVERE, "Unable to disable XML External Entities, which might put you at risk to XXE attacks", e);
-           } catch (SAXNotRecognizedException e) {
-           	 XRLog.load(Level.SEVERE, "Unable to disable XML External Entities, which might put you at risk to XXE attacks", e);
-           }
-    	}
-    	
-    	private void setDocumentBuilderSecurityFeatures(DocumentBuilderFactory dbf) {
-    		try {
-       	      // VERY IMPORTANT: Without these lines, users can pull in arbitary files from the system using XXE.
-       	      // DO NOT REMOVE!
-              dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false);
-              dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
-              dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-              dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-              dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-    		} catch (ParserConfigurationException e) {
-    		  XRLog.load(Level.SEVERE, "Unable to disable XML External Entities, which might put you at risk to XXE attacks", e);
-    		}
-    	}
-    	
-    	private void setTranformerFactorySecurityFeatures(TransformerFactory xformFactory) {
-    		try {
-    		  xformFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
-              xformFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
-    		} catch (IllegalArgumentException e) {
-    		  XRLog.load(Level.SEVERE, "Unable to disable XML External Entities, which might put you at risk to XXE attacks", e);
-    		}
-    	}
-    	
-    	private TransformerFactory loadPreferredTransformerFactory(String preferredImpl) {
-            try {
-            	return TransformerFactory.newInstance(preferredImpl, null);
-            } catch (TransformerFactoryConfigurationError e) {
-            	XRLog.load(Level.SEVERE, "Could not load preferred XML transformer, using default which may not be secure.");
-            	return TransformerFactory.newInstance();
-            }
-    	}
-    	
-    	private DocumentBuilderFactory loadPreferredDocumentBuilderFactory(String preferredImpl) {
-            try {
-            	return preferredImpl == null ? DocumentBuilderFactory.newInstance() : DocumentBuilderFactory.newInstance(preferredImpl, null);
-            } catch (FactoryConfigurationError e) {
-            	XRLog.load(Level.SEVERE, "Could not load preferred XML document builder, using default which may not be secure.");
-            	return DocumentBuilderFactory.newInstance();
-            }
-    	}
+	private static class XMLResourceBuilder {
 
-    	private XMLResource createXMLResource(XMLResource target) {
-            Source input = null;
-            DOMResult output = null;
-            TransformerFactory xformFactory = null;
-            Transformer idTransform = null;
-            XMLReader xmlReader = null;
-            long st = 0L;
+		private void setXmlReaderSecurityFeatures(XMLReader xmlReader) {
+			try {
+				// VERY IMPORTANT: Without these lines, users can pull in arbitary files from the system using XXE.
+				// DO NOT REMOVE!
+				xmlReader.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false);
+				xmlReader.setFeature("http://xml.org/sax/features/external-general-entities", false);
+				xmlReader.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+				xmlReader.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", true);
+				xmlReader.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+			} catch (SAXNotSupportedException e) {
+				XRLog.load(Level.INFO, "Unable to disable XML External Entities, which might put you at risk to XXE attacks", e);
+			} catch (SAXNotRecognizedException e) {
+				XRLog.load(Level.INFO, "Unable to disable XML External Entities, which might put you at risk to XXE attacks", e);
+			}
+		}
 
-            xmlReader = XMLResource.newXMLReader();
+		private void setDocumentBuilderSecurityFeatures(DocumentBuilderFactory dbf) {
+			try {
+				// VERY IMPORTANT: Without these lines, users can pull in arbitary files from the system using XXE.
+				// DO NOT REMOVE!
+				dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false);
+				dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+				dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+				dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+				dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+			} catch (ParserConfigurationException e) {
+				XRLog.load(Level.SEVERE, "Unable to disable XML External Entities, which might put you at risk to XXE attacks", e);
+			}
+		}
 
-            setXmlReaderSecurityFeatures(xmlReader);
-            addHandlers(xmlReader);
-            setParserFeatures(xmlReader);
+		private void setTranformerFactorySecurityFeatures(TransformerFactory xformFactory) {
+			try {
+				xformFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+				xformFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
+			} catch (IllegalArgumentException e) {
+				XRLog.load(Level.SEVERE, "Unable to disable XML External Entities, which might put you at risk to XXE attacks", e);
+			}
+		}
 
-            st = System.currentTimeMillis();
-            try {
-                input = new SAXSource(xmlReader, target.getResourceInputSource());
-                
-                String preferredDocumentBuilderFactory = ThreadCtx.get().sharedContext()._preferredDocumentBuilderFactoryImplementationClass;
-                DocumentBuilderFactory dbf = loadPreferredDocumentBuilderFactory(preferredDocumentBuilderFactory);
-                
-                setDocumentBuilderSecurityFeatures(dbf);
-                dbf.setNamespaceAware(true);
-                dbf.setValidating(false); // validation is the root of all evil in xml - tobe
-                
-                output = new DOMResult(dbf.newDocumentBuilder().newDocument());
-                
-                String preferredTransformerFactory = ThreadCtx.get().sharedContext()._preferredTransformerFactoryImplementationClass;
-                
-                if (preferredTransformerFactory == null) {
-                	xformFactory = TransformerFactory.newInstance();
-                } else {
-                	xformFactory = loadPreferredTransformerFactory(preferredTransformerFactory);
-                }
-                
-                setTranformerFactorySecurityFeatures(xformFactory);
-                idTransform = xformFactory.newTransformer();
-                
-            } catch (Exception ex) {
-                throw new XRRuntimeException(
-                        "Failed on configuring SAX to DOM transformer.", ex);
-            }
+		private TransformerFactory loadPreferredTransformerFactory(String preferredImpl) {
+			try {
+				return TransformerFactory.newInstance(preferredImpl, null);
+			} catch (TransformerFactoryConfigurationError e) {
+				XRLog.load(Level.SEVERE, "Could not load preferred XML transformer, using default which may not be secure.");
+				return TransformerFactory.newInstance();
+			}
+		}
 
-            try {
-                idTransform.transform(input, output);
-            } catch (Exception ex) {
-                throw new XRRuntimeException(
-                        "Can't load the XML resource (using TRaX transformer). " + ex.getMessage(), ex);
-            }
+		private DocumentBuilderFactory loadPreferredDocumentBuilderFactory(String preferredImpl) {
+			try {
+				return preferredImpl == null ? DocumentBuilderFactory.newInstance() : DocumentBuilderFactory.newInstance(preferredImpl, null);
+			} catch (FactoryConfigurationError e) {
+				XRLog.load(Level.SEVERE, "Could not load preferred XML document builder, using default which may not be secure.");
+				return DocumentBuilderFactory.newInstance();
+			}
+		}
 
-            long end = System.currentTimeMillis();
+		private XMLResource createXMLResource(XMLResource target) {
+			Source input = null;
+			DOMResult output = null;
+			TransformerFactory xformFactory = null;
+			Transformer idTransform = null;
+			XMLReader xmlReader = null;
+			long st = 0L;
 
-            target.setElapsedLoadTime(end - st);
+			xmlReader = XMLResource.newXMLReader();
 
-            XRLog.load("Loaded document in ~" + target.getElapsedLoadTime() + "ms");
+			setXmlReaderSecurityFeatures(xmlReader);
+			addHandlers(xmlReader);
+			setParserFeatures(xmlReader);
 
-            target.setDocument((Document) output.getNode());
-            return target;
-        }
+			st = System.currentTimeMillis();
+			try {
+				input = new SAXSource(xmlReader, target.getResourceInputSource());
 
-        /**
-         * Adds the default EntityResolved and ErrorHandler for the SAX parser.
-         */
-        private void addHandlers(XMLReader xmlReader) {
-            try {
-                // add our own entity resolver
-                xmlReader.setEntityResolver(FSEntityResolver.instance());
-                xmlReader.setErrorHandler(new ErrorHandler() {
+				String preferredDocumentBuilderFactory = ThreadCtx.get().sharedContext()._preferredDocumentBuilderFactoryImplementationClass;
+				DocumentBuilderFactory dbf = loadPreferredDocumentBuilderFactory(preferredDocumentBuilderFactory);
 
-                    public void error(SAXParseException ex) {
-                        XRLog.load(ex.getMessage());
-                    }
+				setDocumentBuilderSecurityFeatures(dbf);
+				dbf.setNamespaceAware(true);
+				dbf.setValidating(false); // validation is the root of all evil in xml - tobe
 
-                    public void fatalError(SAXParseException ex) {
-                        XRLog.load(ex.getMessage());
-                    }
+				output = new DOMResult(dbf.newDocumentBuilder().newDocument());
 
-                    public void warning(SAXParseException ex) {
-                        XRLog.load(ex.getMessage());
-                    }
-                });
-            } catch (Exception ex) {
-                throw new XRRuntimeException("Failed on configuring SAX parser/XMLReader.", ex);
-            }
-        }
+				String preferredTransformerFactory = ThreadCtx.get().sharedContext()._preferredTransformerFactoryImplementationClass;
 
-        /**
-         * Sets all standard features for SAX parser, using values from Configuration.
-         */
-        private void setParserFeatures(XMLReader xmlReader) {
-            try {        // perf: validation off
-                xmlReader.setFeature("http://xml.org/sax/features/validation", false);
-                // perf: namespaces
-                xmlReader.setFeature("http://xml.org/sax/features/namespaces", true);
-            } catch (SAXException s) {
-                // nothing to do--some parsers will not allow setting features
-                XRLog.load(Level.WARNING, "Could not set validation/namespace features for XML parser," +
-                        "exception thrown.", s);
-            }
-            if (Configuration.isFalse("xr.load.configure-features", false)) {
-                XRLog.load(Level.FINE, "SAX Parser: by request, not changing any parser features.");
-                return;
-            }
-            
-            // perf: validation off
-            setFeature(xmlReader, "http://xml.org/sax/features/validation", "xr.load.validation");
-            
-            // mem: intern strings
-            setFeature(xmlReader, "http://xml.org/sax/features/string-interning", "xr.load.string-interning");
-            
-            // perf: namespaces
-            setFeature(xmlReader, "http://xml.org/sax/features/namespaces", "xr.load.namespaces");
-            setFeature(xmlReader, "http://xml.org/sax/features/namespace-prefixes", "xr.load.namespace-prefixes");
-        }
+				if (preferredTransformerFactory == null) {
+					xformFactory = TransformerFactory.newInstance();
+				} else {
+					xformFactory = loadPreferredTransformerFactory(preferredTransformerFactory);
+				}
 
-        /**
-         * Attempts to set requested feature on the parser; logs exception if not supported
-         * or not recognized.
-         */
-        private void setFeature(XMLReader xmlReader, String featureUri, String configName) {
-            try {
-                xmlReader.setFeature(featureUri, Configuration.isTrue(configName, false));
+				setTranformerFactorySecurityFeatures(xformFactory);
+				idTransform = xformFactory.newTransformer();
 
-                XRLog.load(Level.FINE, "SAX Parser feature: " +
-                        featureUri.substring(featureUri.lastIndexOf("/")) +
-                        " set to " +
-                        xmlReader.getFeature(featureUri));
-            } catch (SAXNotSupportedException ex) {
-                XRLog.load(Level.WARNING, "SAX feature not supported on this XMLReader: " + featureUri);
-            } catch (SAXNotRecognizedException ex) {
-                XRLog.load(Level.WARNING, "SAX feature not recognized on this XMLReader: " + featureUri +
-                        ". Feature may be properly named, but not recognized by this parser.");
-            }
-        }
+			} catch (Exception ex) {
+				throw new XRRuntimeException(
+						"Failed on configuring SAX to DOM transformer.", ex);
+			}
 
-        @Deprecated
-        public XMLResource createXMLResource(Source source) {
-            DOMResult output = null;
-            TransformerFactory xformFactory = null;
-            Transformer idTransform = null;
-            long st = 0L;
+			try {
+				idTransform.transform(input, output);
+			} catch (Exception ex) {
+				throw new XRRuntimeException(
+						"Can't load the XML resource (using TRaX transformer). " + ex.getMessage(), ex);
+			}
 
-            st = System.currentTimeMillis();
-            try {
-                DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-                
-           	    // VERY IMPORTANT: Without these lines, users can pull in arbitary files from the system using XXE.
-           	    // DO NOT REMOVE!
-                dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false);
-                dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
-                dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-                dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-                dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-                
-                dbf.setNamespaceAware(true);
-                dbf.setValidating(false);//validation is the root of all evil in xml - tobe
-                output = new DOMResult(dbf.newDocumentBuilder().newDocument());
-                
-                try {
-                	xformFactory = TransformerFactory.newInstance("com.sun.org.apache.xalan.internal.xsltc.trax.TransformerFactoryImpl", null);
-                } catch(Exception e) {
-                	XRLog.load(Level.SEVERE, "Could not load preferred XML transformer, using default which may not be secure.");
-                	xformFactory = TransformerFactory.newInstance();
-                }
-                
-                xformFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
-                xformFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
-                
-                idTransform = xformFactory.newTransformer();
-            } catch (Exception ex) {
-                throw new XRRuntimeException("Failed on configuring SAX to DOM transformer.", ex);
-            }
+			long end = System.currentTimeMillis();
 
-            try {
-                idTransform.transform(source, output);
-            } catch (Exception ex) {
-                throw new XRRuntimeException("Can't load the XML resource (using TRaX transformer). " + ex.getMessage(), ex);
-            }
+			target.setElapsedLoadTime(end - st);
 
-            long end = System.currentTimeMillis();
+			XRLog.load("Loaded document in ~" + target.getElapsedLoadTime() + "ms");
 
-            //HACK: should rather use a default constructor
-            XMLResource target = new XMLResource((InputSource) null);
+			target.setDocument((Document) output.getNode());
+			return target;
+		}
 
-            target.setElapsedLoadTime(end - st);
+		/**
+		 * Adds the default EntityResolved and ErrorHandler for the SAX parser.
+		 */
+		private void addHandlers(XMLReader xmlReader) {
+			try {
+				// add our own entity resolver
+				xmlReader.setEntityResolver(FSEntityResolver.instance());
+				xmlReader.setErrorHandler(new ErrorHandler() {
 
-            XRLog.load("Loaded document in ~" + target.getElapsedLoadTime() + "ms");
+					@Override
+					public void error(SAXParseException ex) {
+						XRLog.load(ex.getMessage());
+					}
 
-            target.setDocument((Document) output.getNode());
-            return target;
-        }
-    }
+					@Override
+					public void fatalError(SAXParseException ex) {
+						XRLog.load(ex.getMessage());
+					}
+
+					@Override
+					public void warning(SAXParseException ex) {
+						XRLog.load(ex.getMessage());
+					}
+				});
+			} catch (Exception ex) {
+				throw new XRRuntimeException("Failed on configuring SAX parser/XMLReader.", ex);
+			}
+		}
+
+		/**
+		 * Sets all standard features for SAX parser, using values from Configuration.
+		 */
+		private void setParserFeatures(XMLReader xmlReader) {
+			try {        // perf: validation off
+				xmlReader.setFeature("http://xml.org/sax/features/validation", false);
+				// perf: namespaces
+				xmlReader.setFeature("http://xml.org/sax/features/namespaces", true);
+			} catch (SAXException s) {
+				// nothing to do--some parsers will not allow setting features
+				XRLog.load(Level.WARNING, "Could not set validation/namespace features for XML parser," +
+						"exception thrown.", s);
+			}
+			if (Configuration.isFalse("xr.load.configure-features", false)) {
+				XRLog.load(Level.FINE, "SAX Parser: by request, not changing any parser features.");
+				return;
+			}
+
+			// perf: validation off
+			setFeature(xmlReader, "http://xml.org/sax/features/validation", "xr.load.validation");
+
+			// mem: intern strings
+			setFeature(xmlReader, "http://xml.org/sax/features/string-interning", "xr.load.string-interning");
+
+			// perf: namespaces
+			setFeature(xmlReader, "http://xml.org/sax/features/namespaces", "xr.load.namespaces");
+			setFeature(xmlReader, "http://xml.org/sax/features/namespace-prefixes", "xr.load.namespace-prefixes");
+		}
+
+		/**
+		 * Attempts to set requested feature on the parser; logs exception if not supported
+		 * or not recognized.
+		 */
+		private void setFeature(XMLReader xmlReader, String featureUri, String configName) {
+			try {
+				xmlReader.setFeature(featureUri, Configuration.isTrue(configName, false));
+
+				XRLog.load(Level.FINE, "SAX Parser feature: " +
+						featureUri.substring(featureUri.lastIndexOf("/")) +
+						" set to " +
+						xmlReader.getFeature(featureUri));
+			} catch (SAXNotSupportedException ex) {
+				XRLog.load(Level.WARNING, "SAX feature not supported on this XMLReader: " + featureUri);
+			} catch (SAXNotRecognizedException ex) {
+				XRLog.load(Level.WARNING, "SAX feature not recognized on this XMLReader: " + featureUri +
+						". Feature may be properly named, but not recognized by this parser.");
+			}
+		}
+
+		@Deprecated
+		public XMLResource createXMLResource(Source source) {
+			DOMResult output = null;
+			TransformerFactory xformFactory = null;
+			Transformer idTransform = null;
+			long st = 0L;
+
+			st = System.currentTimeMillis();
+			try {
+				DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+
+				// VERY IMPORTANT: Without these lines, users can pull in arbitary files from the system using XXE.
+				// DO NOT REMOVE!
+				dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false);
+				dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+				dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+				dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+				dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+
+				dbf.setNamespaceAware(true);
+				dbf.setValidating(false);//validation is the root of all evil in xml - tobe
+				output = new DOMResult(dbf.newDocumentBuilder().newDocument());
+
+				try {
+					xformFactory = TransformerFactory.newInstance("com.sun.org.apache.xalan.internal.xsltc.trax.TransformerFactoryImpl", null);
+				} catch (Exception e) {
+					XRLog.load(Level.SEVERE, "Could not load preferred XML transformer, using default which may not be secure.");
+					xformFactory = TransformerFactory.newInstance();
+				}
+
+				xformFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+				xformFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
+
+				idTransform = xformFactory.newTransformer();
+			} catch (Exception ex) {
+				throw new XRRuntimeException("Failed on configuring SAX to DOM transformer.", ex);
+			}
+
+			try {
+				idTransform.transform(source, output);
+			} catch (Exception ex) {
+				throw new XRRuntimeException("Can't load the XML resource (using TRaX transformer). " + ex.getMessage(), ex);
+			}
+
+			long end = System.currentTimeMillis();
+
+			//HACK: should rather use a default constructor
+			XMLResource target = new XMLResource((InputSource) null);
+
+			target.setElapsedLoadTime(end - st);
+
+			XRLog.load("Loaded document in ~" + target.getElapsedLoadTime() + "ms");
+
+			target.setDocument((Document) output.getNode());
+			return target;
+		}
+	}
 }
 
 /*

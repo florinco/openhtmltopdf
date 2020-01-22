@@ -29,125 +29,137 @@ import java.util.logging.Level;
 
 import com.openhtmltopdf.layout.SharedContext;
 import com.openhtmltopdf.resource.ImageResource;
-import com.openhtmltopdf.swing.FSCacheKey;
 import com.openhtmltopdf.swing.NaiveUserAgent;
 import com.openhtmltopdf.util.ImageUtil;
 import com.openhtmltopdf.util.XRLog;
 
 public class PdfBoxUserAgent extends NaiveUserAgent {
-    private SharedContext _sharedContext;
+	private SharedContext _sharedContext;
 
-    private final PdfBoxOutputDevice _outputDevice;
+	private final PdfBoxOutputDevice _outputDevice;
 
-    public PdfBoxUserAgent(PdfBoxOutputDevice outputDevice) {
+	public PdfBoxUserAgent(PdfBoxOutputDevice outputDevice) {
 		super();
 		_outputDevice = outputDevice;
-    }
+	}
 
-    private byte[] readStream(InputStream is) throws IOException {
-        ByteArrayOutputStream out = new ByteArrayOutputStream(is.available());
-        byte[] buf = new byte[10240];
-        int i;
-        while ( (i = is.read(buf)) != -1) {
-            out.write(buf, 0, i);
-        }
-        out.close();
-        return out.toByteArray();
-    }
-    
-    public ImageResource getImageResource(String uriStr) {
-        String uriResolved = resolveURI(uriStr);
-        
-        if (uriResolved == null) {
-           XRLog.load(Level.INFO, "URI resolver rejected loading image at (" + uriStr + ")");
-           return new ImageResource(uriStr, null);
-        }
-        
-        ImageResource resource = _imageCache.get(uriResolved);
-        
-        if (resource != null && resource.getImage() instanceof PdfBoxImage) {
-            // Make copy of PdfBoxImage so we don't stuff up the cache.
-            PdfBoxImage original = (PdfBoxImage) resource.getImage();
-            PdfBoxImage copy = new PdfBoxImage(original.getBytes(), original.getUri(), original.getWidth(), original.getHeight(), original.isJpeg(), original.getXObject());
-            return new ImageResource(resource.getImageUri(), copy);
-        }
-        
-        if (ImageUtil.isEmbeddedBase64Image(uriResolved)) {
-            resource = loadEmbeddedBase64ImageResource(uriResolved);
-            _outputDevice.realizeImage((PdfBoxImage) resource.getImage());
-            _imageCache.put(uriResolved, resource);
-        } else {
-            InputStream is = openStream(uriResolved);
-            
-            if (is != null) {
-                try {
-                    URI uri = new URI(uriStr);
-                    if (uri.getPath() != null
-                        && uri.getPath().toLowerCase(Locale.US)
-                                    .endsWith(".pdf")) {
-                        // TODO: Implement PDF AS IMAGE
-                        // PdfReader reader = _outputDevice.getReader(uri);
-                        // PDFAsImage image = new PDFAsImage(uri);
-                        // Rectangle rect = reader.getPageSizeWithRotation(1);
-                        // image.setInitialWidth(rect.getWidth() *
-                        // _outputDevice.getDotsPerPoint());
-                        // image.setInitialHeight(rect.getHeight() *
-                        // _outputDevice.getDotsPerPoint());
-                        // resource = new ImageResource(uriStr, image);
-                    } else {
-                        byte[] imgBytes = readStream(is);
-                        PdfBoxImage fsImage = new PdfBoxImage(imgBytes, uriStr);
-                        scaleToOutputResolution(fsImage);
-                        _outputDevice.realizeImage(fsImage);
-                        resource = new ImageResource(uriResolved, fsImage);
-                    }
-                    _imageCache.put(uriResolved, resource);
-                } catch (Exception e) {
-                    XRLog.exception(
-                            "Can't read image file; unexpected problem for URI '"
-                                    + uriStr + "'", e);
-                } finally {
-                    try {
-                        is.close();
-                    } catch (IOException e) {
-                        // ignore
-                    }
-                }
-            }
+	private byte[] readStream(InputStream is) throws IOException {
+		ByteArrayOutputStream out = new ByteArrayOutputStream(is.available());
+		byte[] buf = new byte[10240];
+		int i;
+		while ((i = is.read(buf)) != -1) {
+			out.write(buf, 0, i);
+		}
+		out.close();
+		return out.toByteArray();
+	}
 
-            if (resource != null) {
-                resource = new ImageResource(resource.getImageUri(), resource.getImage());
-            } else {
-                resource = new ImageResource(uriStr, null);
-            }
-        }
-        return resource;
-    }
-    
-    private ImageResource loadEmbeddedBase64ImageResource(final String uri) {
-        try {
-            byte[] buffer = ImageUtil.getEmbeddedBase64Image(uri);
-            PdfBoxImage fsImage = new PdfBoxImage(buffer, uri);
-            scaleToOutputResolution(fsImage);
-            return new ImageResource(null, fsImage);
-        } catch (Exception e) {
-            XRLog.exception("Can't read XHTML embedded image.", e);
-        }
-        return new ImageResource(null, null);
-    }
+	@Override
+	public ImageResource getImageResource(String uriStr) {
+		String uriResolved = resolveURI(uriStr);
 
-    private void scaleToOutputResolution(PdfBoxImage image) {
-        float factor = _sharedContext.getDotsPerPixel();
-        if (factor != 1.0f) {
-            image.scale((int) (image.getWidth() * factor), (int) (image.getHeight() * factor));
-        }
-    }
+		if (uriResolved == null) {
+			XRLog.load(Level.INFO, "URI resolver rejected loading image at (" + uriStr + ")");
+			return new ImageResource(uriStr, null);
+		}
 
-    public SharedContext getSharedContext() {
-        return _sharedContext;
-    }
+		ImageResource resource = _imageCache.get(uriResolved);
 
-    public void setSharedContext(SharedContext sharedContext) {
-        _sharedContext = sharedContext;
-    }
+		if (resource != null && resource.getImage() instanceof PdfBoxImage) {
+			// Make copy of PdfBoxImage so we don't stuff up the cache.
+			PdfBoxImage original = (PdfBoxImage) resource.getImage();
+			PdfBoxImage copy = new PdfBoxImage(original.getBytes(), original.getUri(), original.getWidth(), original.getHeight(), original.isJpeg(),
+					original.getXObject());
+			return new ImageResource(resource.getImageUri(), copy);
+		}
+
+		if (ImageUtil.isEmbeddedBase64Image(uriResolved)) {
+			String corruptImageMsg = "A corrupted base64 image was found. The image will be ignored. Image base64: " + uriResolved;
+
+			resource = loadEmbeddedBase64ImageResource(uriResolved);
+			if (resource.getImage() != null) {
+				try {
+					_outputDevice.realizeImage((PdfBoxImage) resource.getImage());
+				} catch (Exception e) {
+					resource = new ImageResource(null, null);
+					XRLog.exception("(1) " + corruptImageMsg + uriResolved);
+				}
+				_imageCache.put(uriResolved, resource);
+			} else {
+				XRLog.exception("(2) " + corruptImageMsg + uriResolved);
+			}
+		} else {
+			InputStream is = openStream(uriResolved);
+
+			if (is != null) {
+				try {
+					URI uri = new URI(uriStr);
+					if (uri.getPath() != null
+							&& uri.getPath().toLowerCase(Locale.US)
+							.endsWith(".pdf")) {
+						// TODO: Implement PDF AS IMAGE
+						// PdfReader reader = _outputDevice.getReader(uri);
+						// PDFAsImage image = new PDFAsImage(uri);
+						// Rectangle rect = reader.getPageSizeWithRotation(1);
+						// image.setInitialWidth(rect.getWidth() *
+						// _outputDevice.getDotsPerPoint());
+						// image.setInitialHeight(rect.getHeight() *
+						// _outputDevice.getDotsPerPoint());
+						// resource = new ImageResource(uriStr, image);
+					} else {
+						byte[] imgBytes = readStream(is);
+						PdfBoxImage fsImage = new PdfBoxImage(imgBytes, uriStr);
+						scaleToOutputResolution(fsImage);
+						_outputDevice.realizeImage(fsImage);
+						resource = new ImageResource(uriResolved, fsImage);
+					}
+					_imageCache.put(uriResolved, resource);
+				} catch (Exception e) {
+					XRLog.exception(
+							"Can't read image file; unexpected problem for URI '"
+									+ uriStr + "'", e);
+				} finally {
+					try {
+						is.close();
+					} catch (IOException e) {
+						// ignore
+					}
+				}
+			}
+
+			if (resource != null) {
+				resource = new ImageResource(resource.getImageUri(), resource.getImage());
+			} else {
+				resource = new ImageResource(uriStr, null);
+			}
+		}
+		return resource;
+	}
+
+	private ImageResource loadEmbeddedBase64ImageResource(String uri) {
+		try {
+			byte[] buffer = ImageUtil.getEmbeddedBase64Image(uri);
+			PdfBoxImage fsImage = new PdfBoxImage(buffer, uri);
+			scaleToOutputResolution(fsImage);
+			return new ImageResource(null, fsImage);
+		} catch (Exception e) {
+			XRLog.exception("Can't read XHTML embedded image.", e);
+		}
+		return new ImageResource(null, null);
+	}
+
+	private void scaleToOutputResolution(PdfBoxImage image) {
+		float factor = _sharedContext.getDotsPerPixel();
+		if (factor != 1.0f) {
+			image.scale((int) (image.getWidth() * factor), (int) (image.getHeight() * factor));
+		}
+	}
+
+	public SharedContext getSharedContext() {
+		return _sharedContext;
+	}
+
+	public void setSharedContext(SharedContext sharedContext) {
+		_sharedContext = sharedContext;
+	}
 }
